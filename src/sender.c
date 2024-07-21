@@ -55,10 +55,11 @@ int main(int argc, char **argv){
     char recvbuffer[16]; //This should be enough to handle any file name
     int recvbytes;
     for(;;){
+        //read filename from client
         bzero(recvbuffer, 16);
-
-        //read from client until send is sent
-        recvbytes = read(connfd, recvbuffer, sizeof(recvbuffer));
+        recvbytes = read(connfd, recvbuffer, sizeof(recvbuffer) - 1);
+        if(recvbytes <= 0) break;
+        recvbuffer[recvbytes] = '\0';
 
         const int filepathbytes = DEFAULT_FILEPATH_SENDER_LEN + recvbytes + 2; //for the '/' and '\0'
         char filepath[filepathbytes];
@@ -67,41 +68,30 @@ int main(int argc, char **argv){
     
         //open file
         FILE *sendfile;
-        sendfile = fopen(filepath, "r");
-        char sendfilebuf[sizeof(long)];
-        long sendfilebytes;
-        printf("Fetching file..\n");
+        sendfile = fopen(filepath, "rb");
 
-        if(sendfile != NULL){
+        if(sendfile != NULL){            
             //if file exists
-            bzero(sendfilebuf, sizeof(long));
+
             //get num of bytes
             fseek(sendfile, 0 , SEEK_END);
-            sendfilebytes = ftell(sendfile);
+            long sendfilebytes = ftell(sendfile);
             fseek(sendfile, 0, SEEK_SET);
 
             //send num of bytes
-            snprintf(sendfilebuf, sizeof(long), "%ld", sendfilebytes);
-            write(connfd, sendfilebuf, sizeof(sendfilebuf));
-            printf("File found..\n");
-
-            //wait for final confirmation
-            bzero(recvbuffer, 16);
-            read(connfd, recvbuffer, 2);
-            if(strncmp(recvbuffer, "OK", 2) != 0)
-                err("Error with final OK");
-
+            write(connfd, &sendfilebytes, sizeof(sendfilebytes));
+        
             //send the file
             printf("Begin sending %ld bytes from %s\n", sendfilebytes , filepath);
             
-            char senddata[sendfilebytes];
-            bzero(senddata, sendfilebytes);
+            char senddata[1024];
+            size_t bytesread;
 
-            while(fgets(senddata, sendfilebytes, sendfile) != NULL){
-                if(write(connfd, senddata, sizeof(senddata)) == -1)
+            while((bytesread = fread(senddata, 1, sizeof(senddata), sendfile)) > 0){
+                if(write(connfd, senddata, bytesread) != bytesread)
                     err("Error sending file bytes");
-                bzero(senddata, sendfilebytes);
             }
+
             fclose(sendfile);
         }else{
             printf("Couldn't find file. Path entered: %s\n", filepath);

@@ -48,24 +48,16 @@ int main(int argc, char **argv){
         printf("Enter the filename to send: ");
         sendbytes = 0;
         while ((sendbuffer[sendbytes++] = getchar()) != '\n' && sendbytes < 16);
-        //copy sendbuffer to save filename
-        snprintf(filenamebuffer, sendbytes, "%s", sendbuffer);
+        sendbuffer[--sendbytes] = '\0';
+        //copy sendbuffer to save filename//+1?
+        snprintf(filenamebuffer, sendbytes + 1, "%s", sendbuffer);
         filenamebytes = sendbytes;
-        sendbytes--; //remove the \n (idk why this works but it doenst work without it)
 
-       
         write(sockfd, sendbuffer, sendbytes);
         
         //get filesize from server
-        char filesizebuf[sizeof(long)];
         long filesize;
-        read(sockfd, filesizebuf, sizeof(filesizebuf));
-        filesize = strtol(filesizebuf, NULL, 10);
-
-        //send confirmation to server (aka that device is ready to recieve the file)
-        bzero(sendbuffer, 16);
-        snprintf(sendbuffer, 3, "OK");
-        write(sockfd, sendbuffer, 3);
+        if(read(sockfd, &filesize, sizeof(filesize)) <=0 ) break;
         
         //prepare to write recieved file
         const int filepathbytes = DEFAULT_FILEPATH_RECEIVER_LEN + filenamebytes + 2; //for the '/' and '\0'
@@ -73,26 +65,26 @@ int main(int argc, char **argv){
         snprintf(filepath, filepathbytes, "%s/%s", DEFAULT_FILEPATH_RECEIVER, filenamebuffer);
         
         FILE *writefile;
-        char writedata[filesize];
-        bzero(writedata, filesize);
-
-        writefile = fopen(filepath, "w");
+        writefile = fopen(filepath, "wb");
         if(writefile != NULL){
             //Begin writing to file
+            
             printf("Writing %ld bytes to %s\n", filesize ,filepath);
 
-            for(;;){
-                if((read(sockfd, writedata, filesize)) <= 0){
-                    printf("TEST\n");
-                    break;
-                }
-                    
-                fprintf(writefile, "%s", writedata);
-                bzero(writedata, filesize);
-                //printf("%s\n", writedata);
+            char writedata[1024];
+            long bytesreceived = 0;
+            size_t bytestoread;
+
+            while(bytesreceived < filesize){
+                //basically read 1024 bytes unless the chunk is smaller than it will only read the actual ammount needed
+                bytestoread = (filesize - bytesreceived < sizeof(writedata)) ? filesize - bytesreceived : sizeof(writedata);
+                int r = read(sockfd, writedata, bytestoread);
+                if(r <= 0) break;
+                fwrite(writedata, 1, r, writefile);
+                bytesreceived += r;
             }
+            
             fclose(writefile);
-            fflush(stdin);
 
         }else{
             err("Error when creating new file");
