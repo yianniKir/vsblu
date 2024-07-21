@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
+#include <dirent.h>
 #include <netdb.h>
 
 #define PORT 8808
