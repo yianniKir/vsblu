@@ -1,4 +1,0 @@
-This file will be sent to recvfile folder!
-Newline
-dummy
-poopidy scoop
