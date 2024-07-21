@@ -21,6 +21,17 @@ int main(int argc, char **argv){
 
     //create socket
 
+    //testing purposes
+    int port;
+    char *sender = NULL;
+    char *receiver = NULL;
+
+    //have to free test
+    char *test = readconfig(&port, &sender, &receiver);
+    printf("%s\n", test);
+    free(test);
+    
+    err("good error for testing");
     int sockfd, connfd;
     struct sockaddr_in servaddr, clientaddr;
 
