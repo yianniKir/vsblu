@@ -2,24 +2,73 @@
 
 int main(int argc, char **argv){
 
-    //create socket and connect to server
+    int optflag = -1; //0 = REPL mode //1 = read from config and exit //-1 = error //10 = help
+
+    char opt;
+    if((opt = getopt(argc, argv, "rch")) != -1){
+        switch(opt){
+            case 'r':
+                optflag = 0;
+                break;
+            case 'c':
+                optflag = 1;
+                break;
+            case 'h':
+                optflag = 10;
+                break;
+            case '?':
+                printf("Usage: ./receiver -[r,c,h]\n");
+                exit(1);
+        }
+    }else{
+        printf("Usage: ./receiver -[r,c,h]\n");
+        exit(1);
+    }
+    if(optflag == 10){
+        printf("0 = REPL, 1 = Read from config and exit\n");
+        exit(1);
+    }
     
-    //upon getting client connectio, start loop
-
-        //read from client until 'send' is read
-
-        //send sharefolder/hello.text to client
-
-        //await client confirmation
-
-    //repeat loop
-
-
-    //create socket
-
-    int sockfd;
     struct sockaddr_in servaddr;
+    char *ip = malloc(16); //fixed len
+    char *receiverirectory;
+    int receiverdirecorylen;
+    char *senderdirectory;
+    int senderdirectorylen;
+    int port;
 
+    //read config or ask for ip of server (preliminary info)
+    if(optflag == 0){
+        for(;;){
+            bzero(ip, 16);
+            printf("Enter a valid IP of the server: ");
+            fgets(ip, 16, stdin);
+
+            if(inet_pton(AF_INET, ip, &(servaddr.sin_addr)) == 1) break;
+            printf("IP not valid\n");
+        }
+
+        //get port and receiverdirectory //TODOOOOO
+        /*
+        
+        TODO
+        
+        
+        */
+    }
+
+    char *filestoreceive;
+    int filestoreceivelen;
+    if(optflag == 1){
+        filestoreceive = readconfig(&ip, &port, &senderdirectory,&receiverirectory, &filestoreceivelen);
+        if(inet_pton(AF_INET, ip, &(servaddr.sin_addr)) != 1){
+            err("IP adress in config file not valid");
+        }
+     
+    }
+
+    //****ESTABLISH CONNECTION */
+    int sockfd;
     if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         err("Error creating socket");
     printf("Socket created successfully..\n");
@@ -27,7 +76,7 @@ int main(int argc, char **argv){
     //associate and reserve port for use by the socket (bind)
     bzero(&servaddr, sizeof(servaddr)); //make sure servaddr is empty
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr("192.168.1.115");
+    servaddr.sin_addr.s_addr = inet_addr(ip);
     servaddr.sin_port = htons(PORT);
 
     //connect
@@ -35,8 +84,28 @@ int main(int argc, char **argv){
         err("Error connecting to server");
     printf("Connected to the server..\n");
 
-    //start loop
-    char sendbuffer[16]; //This ought to be enough to handle any file name
+    //SEND INFO TO SERVER
+    
+    //Send setup info to server
+    write(sockfd, &optflag, sizeof(optflag));
+
+    senderdirectorylen = strlen(senderdirectory);
+    write(sockfd, &senderdirectorylen, sizeof(senderdirectorylen));
+    write(sockfd, senderdirectory, senderdirectorylen);
+
+
+    if(optflag == 1){
+        write(sockfd, &filestoreceivelen, sizeof(filestoreceivelen));
+        printf("%s\n",filestoreceive);
+        write(sockfd, filestoreceive, filestoreceivelen);
+
+        //LISTEN AND RECEIVE FILES
+        
+        //disconnect client
+        exit(1);
+    }
+
+    char sendbuffer[16]; //This ought to be enough to handle any file name THIS HAS TO CHANGE SOON
     int sendbytes;
     char filenamebuffer[16];
     int filenamebytes;
@@ -89,8 +158,6 @@ int main(int argc, char **argv){
         }else{
             err("Error when creating new file");
         }
-
-        
     }
     
     

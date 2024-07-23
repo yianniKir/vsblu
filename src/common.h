@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <getopt.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -33,14 +34,13 @@ void err(const char* errtxt){
 }
 
 //this function will return a pointer to a series of memory with each file name separated by $ signs
-char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
+char *readconfig(char **ip, int *port, char **senderdirectory, char **receiverdirectory, int *len){
     //open file
     FILE *configfile = fopen("vsblu.config", "rb");
     if(configfile == NULL)
         err("No config file");
     
     //write the entire file in to memory
-
     size_t tmpmaxspace = 200;
     char *tmp = malloc(tmpmaxspace);
 
@@ -69,8 +69,17 @@ char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
     char *newpos;
     size_t linelen;
 
-    //port
+    //IP
     newpos = strchr(tmp, '\n');
+    if(newpos==NULL) err("No IP");
+    linelen = newpos - currentpos;
+    *ip = malloc(linelen + 1);
+    strncpy(*ip, currentpos, linelen);
+    (*ip)[linelen] = '\0';
+
+    //port
+    currentpos = newpos + 1;
+    newpos = strchr(currentpos, '\n');
     if(newpos==NULL) err("No port");
     linelen = newpos - currentpos;
     char portstr[linelen + 1]; // '\0' char
@@ -86,7 +95,7 @@ char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
     *senderdirectory = malloc(linelen + 1);
     strncpy(*senderdirectory, currentpos, linelen);
     (*senderdirectory)[linelen] = '\0';
-
+    
     //reciever
     currentpos = newpos + 1; //same here
     newpos = strchr(currentpos, '\n');
@@ -104,7 +113,7 @@ char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
 
     n = 0;
     currentpos = newpos + 1;
-
+    int linenum = 0;
     for(;;){
         if(n == filesmaxspace - 1){
             filesmaxspace = (size_t) 2 * filesmaxspace;
@@ -117,6 +126,7 @@ char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
         putchar(filesbuffer[n]);
         if(c == '\n'){
             filesbuffer[n++] = '$';
+            linenum++;
         }else if(c == '+'){
             break;
         }else{
@@ -124,24 +134,10 @@ char *readconfig(int *port, char **senderdirectory, char **receiverdirectory){
         }
     }
     filesbuffer[n] = '\0';
-    
+    *len = n;
     free(tmp);
 
     return filesbuffer;
 }
 
 #endif
-/*currentpos = newpos + 1;
-        newpos = strchr(currentpos, '\n');
-        if(newpos==NULL) break;
-        linelen = newpos - currentpos; //we also want the \n
-        
-        if(n + linelen >= filesmaxspace){
-            filesmaxspace = (size_t) 2 * filesmaxspace;
-            filesbuffer = realloc(filesbuffer, filesmaxspace);
-        }
-        n+=linelen;
-
-        strncpy(filepos, currentpos, linelen);
-        filesbuffer[linelen] = '$';
-        filepos+=linelen;*/

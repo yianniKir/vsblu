@@ -22,7 +22,7 @@ int main(int argc, char **argv){
     //create socket
 
     //testing purposes
-    int port;
+    /*int port;
     char *sender = NULL;
     char *receiver = NULL;
 
@@ -32,8 +32,12 @@ int main(int argc, char **argv){
     free(test);
     
     err("good error for testing");
+    */
+    
     int sockfd, connfd;
     struct sockaddr_in servaddr, clientaddr;
+
+    //ENTER PORT NUM
 
     if((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         err("Error creating socket");
@@ -62,53 +66,76 @@ int main(int argc, char **argv){
         err("Server accept failed");
     printf("Server accepted the client..\n");
 
-    //start loop
-    char recvbuffer[16]; //This should be enough to handle any file name
-    int recvbytes;
-    for(;;){
-        //read filename from client
-        bzero(recvbuffer, 16);
-        recvbytes = read(connfd, recvbuffer, sizeof(recvbuffer) - 1);
-        if(recvbytes <= 0) break;
-        recvbuffer[recvbytes] = '\0';
-
-        const int filepathbytes = DEFAULT_FILEPATH_SENDER_LEN + recvbytes + 2; //for the '/' and '\0'
-        char filepath[filepathbytes];
-
-        snprintf(filepath, filepathbytes, "%s/%s", DEFAULT_FILEPATH_SENDER, recvbuffer);
+    int optflag;
+    int senderdirectorylen;
     
-        //open file
-        FILE *sendfile;
-        sendfile = fopen(filepath, "rb");
 
-        if(sendfile != NULL){            
-            //if file exists
+    if(read(connfd, &optflag, sizeof(optflag)) <= 0) err("Error receiving optflag");
 
-            //get num of bytes
-            fseek(sendfile, 0 , SEEK_END);
-            long sendfilebytes = ftell(sendfile);
-            fseek(sendfile, 0, SEEK_SET);
+    if(read(connfd, &senderdirectorylen, sizeof(senderdirectorylen)) <= 0) err("Error sender directory len optflag");
+    char *senderdirectory = malloc(senderdirectorylen);
+    if(read(connfd, senderdirectory, senderdirectorylen) <= 0) err("Error sender directory");
 
-            //send num of bytes
-            write(connfd, &sendfilebytes, sizeof(sendfilebytes));
+    
+    if(optflag == 1){
+        int filestoreceivelen;
+        if(read(connfd, &filestoreceivelen, sizeof(filestoreceivelen)) <= 0) err("Error getting num of files to receive");
+        char *filestoreceive = malloc(filestoreceivelen);
+        if(read(connfd, filestoreceive, filestoreceivelen) <= 0) err("Error getting num of files to receive");
+
+        //send all the files
+    }
+
+    if(optflag == 2){
+        //start loop
+        char recvbuffer[16]; //This should be enough to handle any file name
+        int recvbytes;
+        for(;;){
+            //read filename from client
+            bzero(recvbuffer, 16);
+            recvbytes = read(connfd, recvbuffer, sizeof(recvbuffer) - 1);
+            if(recvbytes <= 0) break;
+            recvbuffer[recvbytes] = '\0';
+
+            const int filepathbytes = DEFAULT_FILEPATH_SENDER_LEN + recvbytes + 2; //for the '/' and '\0'
+            char filepath[filepathbytes];
+
+            snprintf(filepath, filepathbytes, "%s/%s", DEFAULT_FILEPATH_SENDER, recvbuffer);
         
-            //send the file
-            printf("Begin sending %ld bytes from %s\n", sendfilebytes , filepath);
+            //open file
+            FILE *sendfile;
+            sendfile = fopen(filepath, "rb");
+
+            if(sendfile != NULL){            
+                //if file exists
+
+                //get num of bytes
+                fseek(sendfile, 0 , SEEK_END);
+                long sendfilebytes = ftell(sendfile);
+                fseek(sendfile, 0, SEEK_SET);
+
+                //send num of bytes
+                write(connfd, &sendfilebytes, sizeof(sendfilebytes));
             
-            char senddata[1024];
-            size_t bytesread;
+                //send the file
+                printf("Begin sending %ld bytes from %s\n", sendfilebytes , filepath);
+                
+                char senddata[1024];
+                size_t bytesread;
 
-            while((bytesread = fread(senddata, 1, sizeof(senddata), sendfile)) > 0){
-                if(write(connfd, senddata, bytesread) != bytesread)
-                    err("Error sending file bytes");
+                while((bytesread = fread(senddata, 1, sizeof(senddata), sendfile)) > 0){
+                    if(write(connfd, senddata, bytesread) != bytesread)
+                        err("Error sending file bytes");
+                }
+
+                fclose(sendfile);
+            }else{
+                printf("Couldn't find file. Path entered: %s\n", filepath);
+                exit(1);
             }
-
-            fclose(sendfile);
-        }else{
-            printf("Couldn't find file. Path entered: %s\n", filepath);
-            exit(1);
         }
     }
+    
 
     close(sockfd);
     close(connfd);
